@@ -49,6 +49,7 @@
     int sum = 0;
     dya_foreach(int, iter, arr) {
         sum += *iter;
+        *iter = sum;
     }
 
     dya_free(timestamps_copy);
@@ -103,16 +104,19 @@ void* dya_to_pointer(void* arr);
 
 // Iterate over `arr`s elements. `iter` is an `item_type` pointer.
 #define dya_foreach(item_type, iter, arr)                                      \
-    for (item_type *iter = (item_type*)(arr),                                  \
-                   *M_VAR(end) = iter + dya_size(iter) / sizeof(item_type);    \
-         iter < M_VAR(end); iter++)
+    for (item_type *iter = 0,                                                  \
+                   *M_VAR(i) = (item_type*)(arr),                              \
+                   *M_VAR(end) = M_VAR(i)                                      \
+                               + dya_size(M_VAR(i)) / sizeof(item_type);       \
+         (iter = M_VAR(i)) < M_VAR(end); M_VAR(i)++)
 
 // Iterate in reverse over `arr`s elements. `iter` is an `item_type` pointer.
 #define dya_foreachr(item_type, iter, arr)                                     \
-    for (item_type *M_VAR(start) = (item_type*)(arr),                          \
-                   *iter = M_VAR(start)                                        \
-                         + dya_size(M_VAR(start)) / sizeof(item_type);         \
-         M_VAR(start) && iter-- > M_VAR(start);)
+    for (item_type *iter = 0,                                                  \
+                   *M_VAR(start) = (item_type*)(arr),                          \
+                   *M_VAR(i) = M_VAR(start)                                    \
+                             + dya_size(M_VAR(start)) / sizeof(item_type) - 1; \
+         M_VAR(start) && (iter = M_VAR(i)) >= M_VAR(start); M_VAR(i)--)
 
 // Works on multidimensional arrays.
 #define dya_fill(arr, item_type, /*item*/...)                                  \
