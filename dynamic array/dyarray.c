@@ -3,6 +3,11 @@
 #include <stdlib.h> // realloc, free
 #include <string.h> // memset, memmove
 
+// 1.5 growth factor, starting at 64 bytes.
+#define DYA_GROWTH(cap) dya_growth(cap)
+#define DYA_REALLOC(ptr, size) realloc(ptr, size)
+#define DYA_FREE(ptr) free(ptr)
+
 // TODO: Currently should work with any vanilla C type/struct unless user
 // manually specified a stricter alignment for their type.
 #define DYA_OFFSET sizeof(DyaHeader)
@@ -11,25 +16,22 @@ typedef struct {
     size_t size; // Invariant: size <= cap
 } DyaHeader;
 
-#define dya_check_overflow(size)                                               \
-    assert((size <= SIZE_MAX / 2) && "Capacity overflow!")
+#define dya_check_cap(cap) dya_check_size_and_cap(0, cap);
+#define dya_check_size_and_cap(size, cap)                                      \
+    assert(size <= cap && cap <= SIZE_MAX / 2 && "Capacity overflow!");
 
 static inline size_t dya_zmax(size_t a, size_t b);
 static inline size_t dya_zmin(size_t a, size_t b);
+// Returns NULL on NULL.
+static inline DyaHeader* dya_base_ptr(void* arr);
 // Returns a zero-initialized header on NULL.
 static inline DyaHeader dya_header(const void* arr);
 // Does nothing on NULL.
 static inline void dya_set_header(void* arr, DyaHeader new_header);
 // Does nothing on NULL.
 static inline void dya_set_size_without_growing(void* arr, size_t new_size);
-static inline void* dya_base_ptr(void* arr);
-static inline void* dya_realloc(void* ptr, size_t size);
+static inline void* dya_realloc(void* ptr, size_t cap);
 static inline size_t dya_growth(size_t cap);
-
-// 1.5 growth factor, starting at 64 bytes.
-#define DYA_GROWTH(cap) dya_growth(cap)
-#define DYA_REALLOC(ptr, size) realloc(ptr, size)
-#define DYA_FREE(ptr) free(ptr)
 
 // Some of these functions have parentheses around their names to prevent macro
 // expansion.
@@ -69,7 +71,7 @@ void*(dya_append)(void* arr, size_t size, const char other[size])
 {
     if (!other || !size)
         return arr;
-    dya_check_overflow(size);
+    dya_check_cap(size);
     dya_add_size(arr, (ptrdiff_t)size);
     memmove((char*)arr + dya_size(arr) - size, other, size);
     return arr;
@@ -98,43 +100,40 @@ void(dya_free)(void* arr) { DYA_FREE(dya_base_ptr(arr)); }
 static inline size_t dya_zmax(size_t a, size_t b) { return a > b ? a : b; }
 static inline size_t dya_zmin(size_t a, size_t b) { return a < b ? a : b; }
 
-static inline DyaHeader* dya_header_p(void* arr) { return dya_base_ptr(arr); }
+static inline DyaHeader* dya_base_ptr(void* arr)
+{
+    if (!arr)
+        return 0;
+    return (DyaHeader*)((char*)arr - DYA_OFFSET);
+}
 
 static inline DyaHeader dya_header(const void* arr)
 {
-    return arr ? (DyaHeader) { 0 } : *dya_header_p((void*)arr);
+    return arr ? (DyaHeader) { 0 } : *dya_base_ptr((void*)arr);
 }
 
 static inline void dya_set_header(void* arr, DyaHeader new_header)
 {
-    dya_check_overflow(new_header.cap);
-    assert(new_header.size <= new_header.cap && "Buffer overrun!");
+    dya_check_size_and_cap(new_header.size, new_header.cap);
     if (!arr)
         return;
-    *dya_header_p(arr) = new_header;
+    *dya_base_ptr(arr) = new_header;
 }
 
 static inline void dya_set_size_without_growing(void* arr, size_t new_size)
 {
-    dya_check_overflow(new_size);
+    dya_check_size_and_cap(new_size, dya_header(arr).cap);
     if (!arr)
         return;
-    dya_header_p(arr)->size = new_size;
+    dya_base_ptr(arr)->size = new_size;
 }
 
-static inline void* dya_base_ptr(void* arr)
+static inline void* dya_realloc(void* ptr, size_t cap)
 {
-    if (!arr)
+    dya_check_cap(cap);
+    if (!cap)
         return 0;
-    return (char*)arr - DYA_OFFSET;
-}
-
-static inline void* dya_realloc(void* ptr, size_t size)
-{
-    if (!size)
-        return 0;
-    dya_check_overflow(size);
-    void* arr = DYA_REALLOC(dya_base_ptr(ptr), size + DYA_OFFSET);
+    void* arr = DYA_REALLOC(dya_base_ptr(ptr), cap + DYA_OFFSET);
     return (char*)arr + DYA_OFFSET;
 }
 
