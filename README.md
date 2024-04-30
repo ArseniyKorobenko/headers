@@ -1,4 +1,3 @@
 # headers
-A collection of header-only libraries in C
+A collection of C libraries that I wrote.
 
- - dya.h - Dynamic arrays
