@@ -46,6 +46,11 @@
 
     arr[2][8][16] += timestamps[10].tm_year;
 
+    int sum = 0;
+    dya_foreach(int, iter, arr) {
+        sum += *iter;
+    }
+
     dya_free(timestamps_copy);
     dya_free(timestamps);
     dya_free(arr);
