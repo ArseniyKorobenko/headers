@@ -1,3 +1,3 @@
 # headers
-A collection of C libraries that I wrote.
+A collection of C/C++ libraries that I wrote.
 
